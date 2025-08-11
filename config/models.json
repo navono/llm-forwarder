@@ -1,0 +1,82 @@
+{
+    "Qwen/Qwen3-235B-A22B-Instruct-2507-FP8": {
+        "type": "chat",
+        "url": "http://localhost:18001/v1/chat/completions",
+        "api_key": "qwen3_235b_a22b_instruct_2507_fp8",
+        "model_name": "",
+        "owned_by": "custom"
+    },
+    "qwen3-0.6b": {
+        "type": "chat",
+        "url": "http://localhost:11234/v1/chat/completions",
+        "api_key": "qwen3_0.6b",
+        "model_name": "",
+        "owned_by": "custom"
+    },
+    "tts-1": {
+        "type": "tts",
+        "api_key": "tts-1",
+        "model_name": "",
+        "owned_by": "openai"
+    },
+    "tts-1-hd": {
+        "type": "tts",
+        "api_key": "tts-1-hd",
+        "model_name": "",
+        "owned_by": "openai"
+    },
+    "index-tts": {
+        "type": "tts",
+        "api_key": "index-tts",
+        "model_name": "",
+        "owned_by": "custom"
+    },
+    "whisper-1": {
+        "type": "asr",
+        "api_key": "whisper-1",
+        "model_name": "",
+        "owned_by": "openai"
+    },
+    "qwen3-embedding-4b@q6_k": {
+        "type": "embedding",
+        "url": "http://localhost:11234/v1/embeddings",
+        "api_key": "qwen3_embedding_4b",
+        "model_name": "",
+        "owned_by": "custom"
+    },
+    "jina-embeddings-v3": {
+        "type": "embedding",
+        "url": "https://api.jina.ai/v1/embeddings",
+        "api_key": "jina-embeddings-v3",
+        "model_name": "",
+        "owned_by": "jina"
+    },
+    "jina-embeddings-v4": {
+        "type": "embedding",
+        "url": "https://api.jina.ai/v1/embeddings",
+        "api_key": "jina-embeddings-v4",
+        "model_name": "",
+        "owned_by": "jina"
+    },
+    "jina-reranker-v2-base-multilingual": {
+        "type": "rerank",
+        "url": "https://api.jina.ai/v1/rerank",
+        "api_key": "jina-reranker",
+        "model_name": "",
+        "owned_by": "jina"
+    },
+    "jina-embeddings-v3-classify": {
+        "type": "classify",
+        "url": "https://api.jina.ai/v1/classify",
+        "api_key": "jina-classify",
+        "model_name": "jina-embeddings-v3",
+        "owned_by": "jina"
+    },
+    "jina-search": {
+        "type": "search",
+        "url": "https://s.jina.ai",
+        "api_key": "jina-search",
+        "model_name": "",
+        "owned_by": "jina"
+    }
+}

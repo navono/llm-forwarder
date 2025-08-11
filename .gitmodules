@@ -1,0 +1,3 @@
+[submodule "packages/index-tts"]
+	path = packages/index-tts
+	url = https://github.com/index-tts/index-tts.git

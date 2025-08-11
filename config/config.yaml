@@ -1,0 +1,31 @@
+outputs: "./outputs"
+dev: false
+
+http:
+  host: '0.0.0.0'
+  port: 8008
+
+cluster:
+  scheduler_port: 18786
+  dashboard_address: ':18787'
+  n_workers: 2  # 启动的进程数
+  threads_per_worker: 1  # 每个进程的线程数
+
+asr:
+  url: "ws://192.168.100.136:12393/client-ws"
+  retry_interval: 5
+  max_retries: 10
+  
+tts:
+  url: "ws://192.168.100.136:12393/tts-ws"
+  retry_interval: 5
+  max_retries: 10
+
+log:
+  path: './logs'
+  # 日志模块会为 filename 添加相应的后缀
+  filename: 'py_project'
+  level: 'trace'
+  rotation: '1 days'
+  retention: '5 days'
+  format: '<level>{level: <8}</level> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> - <blue>[{process.id}]</blue> - <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>'

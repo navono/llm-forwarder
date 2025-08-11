@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  index-tts:
+    build:
+      context: .
+      dockerfile: Dockerfile.index-tts
+    ports:
+      - "12234:12234"
+    volumes:
+      # Volume for output files if needed
+      - "./output:/app/output"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODEL_DIR=e:/data/hf_models/hub/models--IndexTeam--Index-TTS/snapshots/146f5cbb46b9c98ba1075ecf9d4b6cc4ad6b7f18
+      - CONFIG_PATH=packages/index-tts/checkpoints/config.yaml
+      - PORT=12234
+      - USE_FP16=1
+      - USE_CUDA_KERNEL=1
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
