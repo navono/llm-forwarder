@@ -1,10 +1,97 @@
-FROM python:3.10-slim
+# --- 阶段 1: 安装依赖 ---
+FROM python:3.10-slim as builder
 
-# 安装系统依赖
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+ENV HTTP_PROXY=$HTTP_PROXY
+ENV HTTPS_PROXY=$HTTPS_PROXY
+ENV NO_PROXY=$NO_PROXY
+
+RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/proxy.conf && \
+    echo "Acquire::https::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf
+
+# 安装系统依赖 - 根据 README 安装 ffmpeg
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
     wget \
+    ffmpeg \
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Miniconda
+RUN curl -o ~/miniconda.sh -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+    chmod +x ~/miniconda.sh && \
+    ~/miniconda.sh -b -p /opt/miniconda && \
+    rm ~/miniconda.sh
+
+# 将 miniconda 添加到环境变量
+ENV PATH=/opt/miniconda/bin:$PATH
+
+# 设置工作目录
+WORKDIR /app
+
+# 直接创建 .condarc 文件配置 conda
+RUN printf "channels:\n" > ~/.condarc && \
+    printf "    - defaults\n" >> ~/.condarc && \
+    printf "    - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/\n" >> ~/.condarc && \
+    printf "    - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/\n" >> ~/.condarc && \
+    printf "    - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/\n" >> ~/.condarc && \
+    printf "channel_priority: flexible\n" >> ~/.condarc && \
+    printf "show_channel_urls: true\n" >> ~/.condarc && \
+    printf "always_yes: true\n" >> ~/.condarc && \
+    printf "ssl_verify: false\n" >> ~/.condarc && \
+    printf "report_errors: false\n" >> ~/.condarc
+
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+# 创建并激活 conda 虚拟环境 - 与 README 一致
+RUN conda create -y -n index-tts python=3.10
+SHELL ["/bin/bash", "-c"]
+RUN echo "source /opt/miniconda/etc/profile.d/conda.sh && conda activate index-tts" >> ~/.bashrc
+ENV PATH /opt/miniconda/envs/index-tts/bin:$PATH
+
+# 在虚拟环境中设置 pip 使用清华源
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 复制 requirements.txt 到容器中
+COPY packages/index-tts/requirements.txt /app/
+
+RUN conda install -y -n index-tts -c conda-forge pynini==2.1.6
+
+# 安装 requirements.txt 中的依赖
+RUN conda run -n index-tts pip install --no-cache-dir -r requirements.txt || echo "Some packages in requirements.txt may have failed to install"
+
+# 安装 index-tts-server.py 所需的依赖
+RUN conda run -n index-tts pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    loguru \
+    pydantic \
+    python-multipart
+
+# 按照 README 安装 PyTorch
+RUN conda run -n index-tts pip install --no-cache-dir torch==2.1.0+cu118 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+
+
+# --- 阶段 2: 复制应用代码并构建最终镜像 ---
+FROM python:3.10-slim
+
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+ENV HTTP_PROXY=$HTTP_PROXY
+ENV HTTPS_PROXY=$HTTPS_PROXY
+ENV NO_PROXY=$NO_PROXY
+
+RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/proxy.conf && \
+    echo "Acquire::https::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
@@ -12,37 +99,64 @@ RUN apt-get update && apt-get install -y \
 # 设置工作目录
 WORKDIR /app
 
+# 复制 conda 环境
+COPY --from=builder /opt/miniconda /opt/miniconda
+ENV PATH=/opt/miniconda/envs/index-tts/bin:/opt/miniconda/bin:$PATH
+
+# 复制 Python 包
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+
+# 复制二进制文件
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# 设置 shell 为 bash
+SHELL ["/bin/bash", "-c"]
+
+# 添加 conda 初始化到 .bashrc
+RUN echo "source /opt/miniconda/etc/profile.d/conda.sh && conda activate index-tts" >> ~/.bashrc
+
 # 复制 index-tts 包文件
-COPY ./packages/index-tts /app/index-tts/
+COPY packages/index-tts /app/index-tts/
 
 # 复制 index-tts-server.py 文件
-COPY ./packages/index-tts-server.py /app/
+COPY packages/index-tts-server.py /app/
 
-# 安装 PyTorch 和 torchaudio (CUDA 11.8 版本)
-RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+# 设置正确的模型路径环境变量以避免路径重复
+ENV MODEL_ROOT_DIR="/app/index-tts/"
+ENV MODEL_CHECKPOINTS_DIR="/app/index-tts/"
+ENV CONFIG_PATH="/app/index-tts/config.yaml"
+ENV MODEL_DIR_FOR_INIT="/app/index-tts/"
 
-# 安装 pynini 和其他依赖
-RUN pip install --no-cache-dir pynini==2.1.6 deepspeed
-RUN pip install --no-cache-dir WeTextProcessing --no-deps
-
-# 安装 FastAPI 和其他服务器依赖
-RUN pip install --no-cache-dir fastapi uvicorn loguru pydantic
-
-# 安装 index-tts 包及其依赖
-WORKDIR /app/index-tts
-RUN pip install --no-cache-dir -e .
-WORKDIR /app
+# 安装 index-tts 包（如果是 editable install，这里不需要再次 pip install）
+# 如果 index-tts 的 setup.py 需要编译，则需要确保 builder 阶段安装了 build-essential
+# 如果您之前是 pip install --no-cache-dir -e .，那么在 builder 阶段执行这个命令会更好
+# 如果您的 index-tts 包结构是标准的，可以直接复制文件，不需要再 pip install -e
+# 如果需要，可以在 builder 阶段执行：
+# WORKDIR /app/index-tts
+# RUN pip install --no-cache-dir -e .
+# WORKDIR /app
 
 # 创建模型目录
 RUN mkdir -p /app/index-tts/checkpoints
+
+# 复制配置文件
+# 注意：这里假设 config.yaml 在宿主机的 packages/index-tts/checkpoints/ 目录下
+# 如果您的模型文件（包括 config.yaml）是放在宿主机的 /mnt/e/... 目录下，
+# 那么这个 COPY 命令是不需要的，因为这些文件将通过 volume 挂载进来。
+# 如果您确实需要将 config.yaml 打包进镜像，请保留此行。
+# 如果您是通过 volume 挂载模型文件，并且 config.yaml 也在挂载的目录中，则可以移除此行。
+COPY packages/index-tts/checkpoints/config.yaml /app/index-tts/checkpoints/
 
 # 暴露端口
 EXPOSE 12234
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
-ENV MODEL_DIR=/app/index-tts/checkpoints
+# 根据您之前的讨论，这里是正确的环境变量设置
+ENV MODEL_ROOT_DIR=/app/index-tts/
+ENV MODEL_CHECKPOINTS_DIR=/app/index-tts/
 ENV CONFIG_PATH=/app/index-tts/checkpoints/config.yaml
+ENV MODEL_DIR_FOR_INIT=/app/index-tts
 ENV PORT=12234
 
 # 启动命令

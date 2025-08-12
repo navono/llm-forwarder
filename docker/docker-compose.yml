@@ -1,22 +1,33 @@
-version: '3.8'
-
+# Docker Compose file
+# 注意：移除了过时的version属性
 services:
   index-tts:
     build:
-      context: .
-      dockerfile: Dockerfile.index-tts
+      context: ..
+      dockerfile: docker/Dockerfile.index-tts
+      args:
+        HTTP_PROXY: ${PROXY_SERVER}
+        HTTPS_PROXY: ${PROXY_SERVER}
+        NO_PROXY: ${NO_PROXY}
     ports:
       - "12234:12234"
     volumes:
       # Volume for output files if needed
       - "./output:/app/output"
+      # 挂载本地模型路径到容器内部
+      - "/mnt/e/data/hf_models/hub/models--IndexTeam--Index-TTS/snapshots/146f5cbb46b9c98ba1075ecf9d4b6cc4ad6b7f18:/app/index-tts/checkpoints"
+      # 挂载服务器脚本，便于直接修改而无需重新构建
+      - "../packages/index-tts-server.py:/app/index-tts-server.py"
+      - "/mnt/e/OneDrive/data_sync/audio_samples:/app/audio_prompt"
     environment:
       - PYTHONUNBUFFERED=1
-      - MODEL_DIR=e:/data/hf_models/hub/models--IndexTeam--Index-TTS/snapshots/146f5cbb46b9c98ba1075ecf9d4b6cc4ad6b7f18
-      - CONFIG_PATH=packages/index-tts/checkpoints/config.yaml
+      - MODEL_CHECKPOINTS_DIR=/app/index-tts
+      - CONFIG_PATH=/app/index-tts/checkpoints/config.yaml
+      - MODEL_DIR_FOR_INIT=/app/index-tts/checkpoints
       - PORT=12234
-      - USE_FP16=1
-      - USE_CUDA_KERNEL=1
+      - USE_FP16=0
+      - USE_CUDA_KERNEL=0
+      - CUDA_VISIBLE_DEVICES=0
     restart: unless-stopped
     deploy:
       resources:

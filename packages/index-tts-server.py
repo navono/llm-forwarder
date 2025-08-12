@@ -28,8 +28,8 @@ except ImportError as e:
 
 # Configure logger
 logger.remove()
-logger.add(sys.stderr, level="INFO")
-logger.add("index-tts-server.log", rotation="10 MB", level="INFO")
+logger.add(sys.stderr, level="TRACE")
+logger.add("index-tts-server.log", rotation="10 MB", level="TRACE")
 
 # Create FastAPI app
 app = FastAPI(
@@ -51,10 +51,19 @@ app.add_middleware(
 tts_instance = None
 
 # Model configuration
-MODEL_DIR = os.environ.get("MODEL_DIR", "checkpoints")
-CONFIG_PATH = os.environ.get("CONFIG_PATH", os.path.join(MODEL_DIR, "config.yaml"))
+MODEL_ROOT_DIR = os.environ.get("MODEL_ROOT_DIR", "/app/index-tts/")  # Default to current directory if not specified
+MODEL_CHECKPOINTS_DIR = os.environ.get("MODEL_CHECKPOINTS_DIR", os.path.join(MODEL_ROOT_DIR, "checkpoints"))  # The directory containing bpe.model, config.yaml etc.
+CONFIG_PATH = os.environ.get("CONFIG_PATH", os.path.join(MODEL_CHECKPOINTS_DIR, "config.yaml"))
+MODEL_DIR_FOR_INIT = os.environ.get("MODEL_DIR_FOR_INIT", MODEL_CHECKPOINTS_DIR)  # This is the directory passed to IndexTTS constructor
 USE_FP16 = os.environ.get("USE_FP16", "1") == "1"
 USE_CUDA_KERNEL = os.environ.get("USE_CUDA_KERNEL", "1") == "1"
+
+print(f"MODEL_ROOT_DIR: {MODEL_ROOT_DIR}")
+print(f"MODEL_CHECKPOINTS_DIR: {MODEL_CHECKPOINTS_DIR}")
+print(f"CONFIG_PATH: {CONFIG_PATH}")
+print(f"MODEL_DIR_FOR_INIT: {MODEL_DIR_FOR_INIT}")
+print(f"USE_FP16: {USE_FP16}")
+print(f"USE_CUDA_KERNEL: {USE_CUDA_KERNEL}")
 
 
 # Request models
@@ -74,9 +83,9 @@ def get_tts_instance():
     # pylint: disable=global-statement
     global tts_instance
     if tts_instance is None:
-        logger.info(f"Initializing IndexTTS model with config {CONFIG_PATH} and model dir {MODEL_DIR}")
+        logger.info(f"Initializing IndexTTS model with config {CONFIG_PATH} and model dir {MODEL_DIR_FOR_INIT}")
         try:
-            tts_instance = IndexTTS(cfg_path=CONFIG_PATH, model_dir=MODEL_DIR, is_fp16=USE_FP16, use_cuda_kernel=USE_CUDA_KERNEL)
+            tts_instance = IndexTTS(cfg_path=CONFIG_PATH, model_dir=MODEL_DIR_FOR_INIT, is_fp16=USE_FP16, use_cuda_kernel=USE_CUDA_KERNEL)
             logger.info("IndexTTS model initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize IndexTTS: {e}")
@@ -139,7 +148,8 @@ async def tts_endpoint(request: TTSRequest, background_tasks: BackgroundTasks):
         if request.audio_prompt:
             audio_prompt_path = await process_audio_prompt(request.audio_prompt)
             background_tasks.add_task(lambda: os.unlink(audio_prompt_path) if audio_prompt_path and os.path.exists(audio_prompt_path) else None)
-
+        else:
+            audio_prompt_path = "./audio_prompt/Female-成熟_01.wav"
         # Create temporary output file
         with tempfile.NamedTemporaryFile(suffix=f".{request.output_format}", delete=False) as temp_file:
             output_path = temp_file.name
@@ -149,10 +159,27 @@ async def tts_endpoint(request: TTSRequest, background_tasks: BackgroundTasks):
 
         # Generate speech
         logger.info(f"Generating speech for text: {request.text[:50]}...")
-        # Call infer_fast and ignore the result as we're using the output file directly
-        tts.infer_fast(
-            audio_prompt=audio_prompt_path, text=request.text, output_path=output_path, verbose=request.verbose, max_text_tokens_per_sentence=request.max_text_tokens_per_sentence, sentences_bucket_max_size=request.sentences_bucket_max_size
-        )
+
+        # 设置与成功案例相同的参数
+        kwargs = {
+            "do_sample": True,
+            "top_p": 0.8,
+            "top_k": 30,
+            "temperature": 1.0,
+            "length_penalty": 0.0,
+            "num_beams": 3,
+            "repetition_penalty": 10.0,
+            "max_mel_tokens": 600,
+        }
+
+        # 使用infer方法替代infer_fast
+        logger.trace(f"audio_prompt_path: {audio_prompt_path}")
+        logger.trace(f"request.text: {request.text}")
+        logger.trace(f"output_path: {output_path}")
+        logger.trace(f"verbose: {request.verbose}")
+        logger.trace(f"max_text_tokens_per_sentence: {request.max_text_tokens_per_sentence}")
+        logger.trace(f"kwargs: {kwargs}")
+        tts.infer(audio_prompt_path, request.text, output_path, verbose=request.verbose, max_text_tokens_per_sentence=request.max_text_tokens_per_sentence, **kwargs)
 
         # Stream the audio file
         def iterfile():
@@ -176,10 +203,19 @@ async def speech_endpoint(request: Request, background_tasks: BackgroundTasks):
         data = await request.json()
 
         # Convert to TTSRequest format
+        # 处理response_format，确保它是一个字符串
+        response_format = data.get("response_format", {})
+        output_format = response_format.get("type", "mp3") if isinstance(response_format, dict) else "mp3"
+
+        # 确保有文本输入
+        text = data.get("input", "")
+        if not text:
+            text = "测试文本"  # 默认测试文本
+
         tts_request = TTSRequest(
-            text=data.get("input", ""),
+            text=text,
             audio_prompt=data.get("voice", None),
-            output_format=data.get("response_format", {}).get("type", "mp3"),
+            output_format=output_format,
             max_text_tokens_per_sentence=data.get("max_text_tokens_per_sentence", 100),
             sentences_bucket_max_size=data.get("sentences_bucket_max_size", 4),
             verbose=data.get("verbose", False),
