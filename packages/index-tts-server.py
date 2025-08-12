@@ -74,6 +74,14 @@ class TTSRequest(BaseModel):
     max_text_tokens_per_sentence: int = Field(100, description="Maximum text tokens per sentence")
     sentences_bucket_max_size: int = Field(4, description="Maximum sentences per bucket")
     verbose: bool = Field(False, description="Enable verbose output")
+    repetition_penalty: int = Field(10, description="Repetition penalty")
+    top_p: float = Field(0.8, description="Top-p sampling parameter")
+    top_k: int = Field(30, description="Top-k sampling parameter")
+    temperature: float = Field(1.0, description="Sampling temperature")
+    length_penalty: float = Field(0.0, description="Length penalty")
+    num_beams: int = Field(3, description="Number of beams")
+    max_mel_tokens: int = Field(600, description="Maximum mel tokens")
+    do_sample: bool = Field(True, description="Do sample")
 
 
 # Helper functions
@@ -162,14 +170,14 @@ async def tts_endpoint(request: TTSRequest, background_tasks: BackgroundTasks):
 
         # 设置与成功案例相同的参数
         kwargs = {
-            "do_sample": True,
-            "top_p": 0.8,
-            "top_k": 30,
-            "temperature": 1.0,
-            "length_penalty": 0.0,
-            "num_beams": 3,
-            "repetition_penalty": 10.0,
-            "max_mel_tokens": 600,
+            "do_sample": request.do_sample,
+            "top_p": request.top_p,
+            "top_k": request.top_k,
+            "temperature": request.temperature,
+            "length_penalty": request.length_penalty,
+            "num_beams": request.num_beams,
+            "repetition_penalty": request.repetition_penalty,
+            "max_mel_tokens": request.max_mel_tokens,
         }
 
         # 使用infer方法替代infer_fast
