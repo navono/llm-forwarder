@@ -74,7 +74,7 @@ class TTSRequest(BaseModel):
     max_text_tokens_per_sentence: int = Field(100, description="Maximum text tokens per sentence")
     sentences_bucket_max_size: int = Field(4, description="Maximum sentences per bucket")
     verbose: bool = Field(False, description="Enable verbose output")
-    repetition_penalty: int = Field(10, description="Repetition penalty")
+    repetition_penalty: float = Field(10.0, description="Repetition penalty")
     top_p: float = Field(0.8, description="Top-p sampling parameter")
     top_k: int = Field(30, description="Top-k sampling parameter")
     temperature: float = Field(1.0, description="Sampling temperature")
@@ -182,7 +182,7 @@ async def tts_endpoint(request: TTSRequest, background_tasks: BackgroundTasks):
 
         # 使用infer方法替代infer_fast
         logger.trace(f"audio_prompt_path: {audio_prompt_path}")
-        logger.trace(f"request.text: {request.text}")
+        # logger.trace(f"request.text: {request.text}")
         logger.trace(f"output_path: {output_path}")
         logger.trace(f"verbose: {request.verbose}")
         logger.trace(f"max_text_tokens_per_sentence: {request.max_text_tokens_per_sentence}")
