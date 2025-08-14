@@ -15,7 +15,7 @@ from tests.integration.base import HTTP_OK
 # Constants for testing
 INDEX_TTS_SERVICE_URL = "http://localhost:8008"  # Default port for index-tts server
 
-TTS_ENDPOINT = "/v1/tts"
+SPEECH_ENDPOINT = "/v1/audio/speech"
 
 
 # Skip marker for tests that require a running index-tts service
@@ -58,8 +58,9 @@ def test_health_endpoint():
 def test_tts_endpoint_with_text():
     """Test the TTS endpoint with text input"""
     request_data = {
-        "text": TEST_TEXT,
-        "output_format": "mp3",
+        "input": TEST_TEXT,
+        "model": "index-tts",
+        "response_format": "mp3",
         "max_text_tokens_per_sentence": 100,
         "sentences_bucket_max_size": 4,
         "verbose": True,
@@ -76,7 +77,7 @@ def test_tts_endpoint_with_text():
     output_path = os.path.join("outputs", f"tts_output_{current_time}_{hash(TEST_TEXT)}.wav")
 
     # 使用stream=True参数来处理流式响应
-    response = requests.post(f"{INDEX_TTS_SERVICE_URL}{TTS_ENDPOINT}", json=request_data, stream=True)
+    response = requests.post(f"{INDEX_TTS_SERVICE_URL}{SPEECH_ENDPOINT}", json=request_data, stream=True)
 
     assert response.status_code == HTTP_OK
     assert response.headers["Content-Type"] in ["audio/mpeg", "audio/wav"]
@@ -119,7 +120,7 @@ def test_tts_endpoint_with_text():
 
 #     request_data = {"text": TEST_TEXT, "audio_prompt": audio_base64, "output_format": "mp3"}
 
-#     response = requests.post(f"{INDEX_TTS_SERVICE_URL}{TTS_ENDPOINT}", json=request_data)
+#     response = requests.post(f"{INDEX_TTS_SERVICE_URL}{SPEECH_ENDPOINT}", json=request_data)
 
 #     assert response.status_code == HTTP_OK
 #     assert response.headers["Content-Type"] == "audio/mpeg"
@@ -148,7 +149,7 @@ def test_tts_endpoint_with_text():
 #     # Missing required text parameter
 #     request_data = {"output_format": "mp3"}
 
-#     response = requests.post(f"{INDEX_TTS_SERVICE_URL}{TTS_ENDPOINT}", json=request_data)
+#     response = requests.post(f"{INDEX_TTS_SERVICE_URL}{SPEECH_ENDPOINT}", json=request_data)
 
 #     # Should return a 422 Unprocessable Entity or 400 Bad Request
 #     assert response.status_code in [422, HTTP_BAD_REQUEST]
@@ -159,7 +160,7 @@ def test_tts_endpoint_with_text():
 #     """Test the TTS endpoint with WAV output format"""
 #     request_data = {"text": TEST_TEXT, "output_format": "wav"}
 
-#     response = requests.post(f"{INDEX_TTS_SERVICE_URL}{TTS_ENDPOINT}", json=request_data)
+#     response = requests.post(f"{INDEX_TTS_SERVICE_URL}{SPEECH_ENDPOINT}", json=request_data)
 
 #     assert response.status_code == HTTP_OK
 #     assert response.headers["Content-Type"] == "audio/wav"

@@ -2,18 +2,18 @@ import uvicorn
 from fastapi import FastAPI
 from loguru import logger
 
-from .handler_llm_embed import handler_router as embed_handler_router
-from .handler_llm_reranker import handler_router as reranker_handler_router
-from .handler_llm_texts import handler_router as texts_handler_router
-from .handler_llm_tts import handler_router as tts_handler_router
+from .handler_audio import handler_router as audio_handler_router
+from .handler_embed import handler_router as embed_handler_router
+from .handler_reranker import handler_router as reranker_handler_router
 from .handler_root import handler_router as root_handler_router
+from .handler_texts import handler_router as texts_handler_router
 
 app = FastAPI()
 app.include_router(root_handler_router)
 app.include_router(texts_handler_router)
 app.include_router(embed_handler_router)
 app.include_router(reranker_handler_router)
-app.include_router(tts_handler_router)
+app.include_router(audio_handler_router)
 
 
 class HTTPServer:

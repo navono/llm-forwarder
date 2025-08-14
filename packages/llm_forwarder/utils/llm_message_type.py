@@ -48,11 +48,26 @@ class AudioSpeechRequest(BaseModel):
     input: str = Field(..., description="要转换的文本")
     voice: str = Field("alloy", description="语音类型")
     response_format: str | None = Field("mp3", description="音频格式")
-    speed: float | None = Field(1.0, description="语音速度")
+    voice_file_path: str | None = Field(None, description="Path to audio prompt file (alternative to voice)")
+    speed: float | None = Field(1.0, description="Speech speed factor")
+    stream_format: str | None = Field("audio", description="Stream format")
+
+    # Advanced generation parameters
+    max_text_tokens_per_sentence: int | None = Field(100, description="Maximum text tokens per sentence")
+    sentences_bucket_max_size: int | None = Field(4, description="Maximum bucket size for sentences")
+    verbose: bool | None = Field(False, description="Enable verbose output")
 
 
-class AudioTranscriptionResponse(BaseModel):
-    text: str
+class AudioTranscriptionRequest(BaseModel):
+    model: str = Field(..., description="TTS模型名称")
+    file: str = Field(..., description="要转换的文本")
+    chunking_strategy: str | None = Field("split", description="音频分块策略")
+    include: list[str] | None = Field(None, description="要包含的字段")
+    language: str | None = Field(None, description="音频语言")
+    response_format: str | None = Field("json", description="音频格式")
+    stream: bool | None = Field(False, description="是否流式输出")
+    temperature: float | None = Field(0.0, description="温度参数")
+    timestamp_granularities: list[str] | None = Field(None, description="时间戳粒度")
 
 
 class EmbeddingRequest(BaseModel):

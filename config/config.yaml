@@ -24,7 +24,7 @@ tts:
 log:
   path: './logs'
   # 日志模块会为 filename 添加相应的后缀
-  filename: 'py_project'
+  filename: 'llm_forwarder.log'
   level: 'trace'
   rotation: '1 days'
   retention: '5 days'

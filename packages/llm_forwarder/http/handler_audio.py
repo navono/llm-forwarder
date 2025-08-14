@@ -5,8 +5,8 @@ import aiohttp
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from loguru import logger
-from pydantic import BaseModel, Field
 
+from packages.llm_forwarder.utils.llm_message_type import AudioSpeechRequest, AudioTranscriptionRequest
 from packages.llm_forwarder.utils.llm_utils import AVAILABLE_MODELS, HTTP_OK
 
 # Create router
@@ -52,24 +52,6 @@ async def check_tts_service():
         return False
 
 
-class TTSRequest(BaseModel):
-    """
-    Request model for text-to-speech synthesis.
-    """
-
-    model: str = Field(..., description="Model name to use for TTS")
-    text: str = Field(..., description="Text to synthesize")
-    voice: str | None = Field(None, description="Base64-encoded audio prompt or path to audio file")
-    voice_file_path: str | None = Field(None, description="Path to audio prompt file (alternative to voice)")
-    response_format: str = Field("mp3", description="Audio format to return (mp3 or wav)")
-    speed: float | None = Field(1.0, description="Speech speed factor")
-
-    # Advanced generation parameters
-    max_text_tokens_per_sentence: int | None = Field(100, description="Maximum text tokens per sentence")
-    sentences_bucket_max_size: int | None = Field(4, description="Maximum bucket size for sentences")
-    verbose: bool | None = Field(False, description="Enable verbose output")
-
-
 @handler_router.post("/v1/audio/speech", response_class=Response)
 async def create_speech(request: Request):
     """
@@ -78,7 +60,7 @@ async def create_speech(request: Request):
     try:
         # Parse request body
         body = await request.json()
-        tts_request = TTSRequest(**body)
+        tts_request = AudioSpeechRequest(**body)
 
         # Check if TTS service is available
         if not await check_tts_service():
@@ -94,8 +76,8 @@ async def create_speech(request: Request):
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.error(f"Error processing TTS request: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing TTS request: {str(e)}") from e
+        logger.error(f"Error processing speech request: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing speech request: {str(e)}") from e
 
 
 def _parse_voice_prompt(body):
@@ -107,69 +89,7 @@ def _parse_voice_prompt(body):
     return None
 
 
-def _parse_speed(body):
-    """Parse speed parameter from various request structures."""
-    if "speed" in body:
-        return body["speed"]
-    elif "temperature" in body:
-        return body["temperature"]
-    return 1.0  # Default speed
-
-
-@handler_router.post("/v1/tts", response_class=Response)
-async def create_speech_v1_tts(request: Request):
-    """
-    Alternative endpoint for text-to-speech synthesis using docker-index-tts service.
-    This endpoint follows OpenAI's TTS API format.
-    """
-    try:
-        # Parse request body
-        body = await request.json()
-        input_text = body.get("text", "")
-        if input_text == "":
-            logger.error("Input text is empty")
-            raise HTTPException(status_code=400, detail="Text is required")
-
-        # 将请求体转换为 TTSRequest 格式
-        # 处理 OpenAI 风格的请求格式
-        converted_body = {
-            "model": INDEX_TTS_MODEL_KEY,  # 默认使用 index-tts 模型
-            "text": input_text,
-            "output_format": body.get("output_format", "mp3"),
-            "voice": _parse_voice_prompt(body),
-        }
-
-        # 复制其他可能的字段
-        for field in ["max_text_tokens_per_sentence", "sentences_bucket_max_size", "verbose"]:
-            if field in body:
-                converted_body[field] = body[field]
-
-        logger.debug(f"Converted TTS request body: {converted_body}")
-
-        # 创建 TTSRequest 对象 - 移除 None 值
-        converted_body = {k: v for k, v in converted_body.items() if v is not None}
-        tts_request = TTSRequest(**converted_body)
-
-        # Check if TTS service is available
-        if not await check_tts_service():
-            logger.error("TTS service is not available")
-            raise HTTPException(status_code=503, detail="TTS service is not available")
-
-        # Process audio prompt
-        audio_prompt_base64 = await process_audio_prompt(tts_request)
-
-        # Forward request to docker-index-tts service
-        return await perform_tts_inference(tts_request, audio_prompt_base64)
-
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Error processing TTS request at /v1/tts: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing TTS request: {str(e)}") from e
-
-
-async def process_audio_prompt(tts_request: TTSRequest) -> str:
+async def process_audio_prompt(tts_request: AudioSpeechRequest) -> str:
     """
     Process the audio prompt from the request and return as base64 string.
     """
@@ -193,16 +113,16 @@ async def process_audio_prompt(tts_request: TTSRequest) -> str:
         return None
 
 
-async def perform_tts_inference(tts_request: TTSRequest, audio_prompt_base64: str = None) -> Response:
+async def perform_tts_inference(tts_request: AudioSpeechRequest, audio_prompt_base64: str = None) -> Response:
     """
     Forward TTS request to docker-index-tts service and return the audio response.
     """
-    logger.info(f"Forwarding TTS request to docker-index-tts service for text: {tts_request.text[:50]}...")
+    logger.info(f"Forwarding TTS request to docker-index-tts service for text: {tts_request.input[:50]}...")
 
     try:
         # Prepare request payload for docker-index-tts service based on the provided test script format
         payload = {
-            "text": tts_request.text,
+            "text": tts_request.input,
             "response_format": {"type": tts_request.response_format.lower()},
             "max_text_tokens_per_sentence": tts_request.max_text_tokens_per_sentence,
             "sentences_bucket_max_size": tts_request.sentences_bucket_max_size,
@@ -241,3 +161,20 @@ async def perform_tts_inference(tts_request: TTSRequest, audio_prompt_base64: st
     except Exception as e:
         logger.error(f"TTS inference failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"TTS inference failed: {str(e)}") from e
+
+
+@handler_router.post("/v1/audio/transcriptions", response_class=Response)
+async def create_transcriptions(request: AudioTranscriptionRequest):
+    """
+    Alternative endpoint for speech-to-text synthesis using docker-index-tts service.
+    This endpoint follows OpenAI's TTS API format.
+    """
+    try:
+        pass
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error processing TTS request at /v1/tts: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing TTS request: {str(e)}") from e
