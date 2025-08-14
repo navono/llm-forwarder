@@ -1,11 +1,10 @@
 dev:
-	uv run -m src.llm_forwarder
-
-test-openai:
-	uv run python -m pytest tests/test_openai.py -v
+	uv run -m packages.llm_forwarder
 
 test-integration:
 	uv run python -m pytest tests/integration/ -v
+
+# uv run python -m pytest tests/integration/test_handler_index_tts.py -v -s
 
 ruff-fix:
 	ruff check --fix .

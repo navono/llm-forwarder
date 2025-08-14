@@ -178,6 +178,7 @@ async def tts_endpoint(request: TTSRequest, background_tasks: BackgroundTasks):
             "num_beams": request.num_beams,
             "repetition_penalty": request.repetition_penalty,
             "max_mel_tokens": request.max_mel_tokens,
+            "sentences_bucket_max_size": request.sentences_bucket_max_size,
         }
 
         # 使用infer方法替代infer_fast

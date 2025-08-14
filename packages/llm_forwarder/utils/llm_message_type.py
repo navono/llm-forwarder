@@ -106,6 +106,7 @@ class ModelInfo(BaseModel):
     object: str = "model"
     created: int
     owned_by: str
+    capabilities: dict = Field(default_factory=dict, description="模型能力")
 
 
 class ModelsResponse(BaseModel):

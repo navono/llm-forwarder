@@ -13,20 +13,9 @@
         "model_name": "",
         "owned_by": "custom"
     },
-    "tts-1": {
-        "type": "tts",
-        "api_key": "tts-1",
-        "model_name": "",
-        "owned_by": "openai"
-    },
-    "tts-1-hd": {
-        "type": "tts",
-        "api_key": "tts-1-hd",
-        "model_name": "",
-        "owned_by": "openai"
-    },
     "index-tts": {
         "type": "tts",
+        "url": "http://localhost:12234",
         "api_key": "index-tts",
         "model_name": "",
         "owned_by": "custom"

@@ -38,11 +38,36 @@ async def home():
         return {"message": "Error processing request", "error": str(e)}
 
 
+@handler_router.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @handler_router.get("/v1/models")
 async def list_models() -> ModelsResponse:
     """列出所有可用模型"""
     models = []
     for model_id, info in AVAILABLE_MODELS.items():
-        models.append(ModelInfo(id=model_id, created=get_current_timestamp(), owned_by=info["owned_by"]))
+        # 根据模型类型设置能力
+        capabilities = {}
+        model_type = info.get("type", "")
+
+        # 设置模型能力
+        if model_type == "chat":
+            capabilities["chat"] = True
+        elif model_type == "embedding":
+            capabilities["embedding"] = True
+        elif model_type == "tts":
+            capabilities["tts"] = True
+        elif model_type == "asr":
+            capabilities["asr"] = True
+        elif model_type == "rerank":
+            capabilities["rerank"] = True
+        elif model_type == "classify":
+            capabilities["classify"] = True
+        elif model_type == "search":
+            capabilities["search"] = True
+
+        models.append(ModelInfo(id=model_id, created=get_current_timestamp(), owned_by=info["owned_by"], capabilities=capabilities))
 
     return ModelsResponse(data=models)
